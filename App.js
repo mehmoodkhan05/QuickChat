@@ -15,7 +15,7 @@ export default function App() {
       <StatusBar style="auto" />
       <Stack.Navigator initialRouteName="Login">
         <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
-        <Stack.Screen name="ChatList" component={ChatList} options={{ title: 'Chats' }} />
+        <Stack.Screen name="ChatList" component={ChatList} options={{ headerShown: false }} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>

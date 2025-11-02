@@ -89,21 +89,27 @@ export default function ChatScreen({ route, navigation }) {
     <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="black" />
+            <Ionicons name="arrow-back" size={24} color="#8e8e93" />
           </TouchableOpacity>
-          <Image style={styles.profileImage} source={{uri: otherUser ? otherUser.profilePicUrl : 'https://via.placeholder.com/150'}} />
+          {otherUser && otherUser.profilePicUrl ? (
+            <Image style={styles.profileImage} source={{uri: otherUser.profilePicUrl}} />
+            ) : (
+                <View style={styles.defaultProfile} >
+                    <Ionicons name="person" size={24} color="white" />
+                </View>
+            )}
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>{otherUser ? otherUser.username : 'Chat'}</Text>
             <Text style={styles.lastSeen}>Last seen today 11:00 AM</Text>
           </View>
           <TouchableOpacity style={styles.callButton}>
-            <Ionicons name="call" size={24} color="black" />
+            <Ionicons name="call" size={24} color="#8e8e93" />
           </TouchableOpacity>
         </View>
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -115,7 +121,7 @@ export default function ChatScreen({ route, navigation }) {
         />
         <View style={styles.inputContainer}>
           <TouchableOpacity style={styles.plusButton}>
-            <Ionicons name="add" size={24} color="#007AFF" />
+            <Ionicons name="add" size={24} color="#8e8e93" />
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -127,15 +133,15 @@ export default function ChatScreen({ route, navigation }) {
           {newMessage.trim() === '' ? (
             <View style={styles.rightButtons}>
               <TouchableOpacity style={styles.cameraButton}>
-                <Ionicons name="camera" size={24} color="#007AFF" />
+                <Ionicons name="camera" size={24} color="#8e8e93" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.voiceButton}>
-                <Ionicons name="mic" size={24} color="#007AFF" />
+                <Ionicons name="mic" size={24} color="#8e8e93" />
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-              <Ionicons name="send" size={24} color="#007AFF" />
+              <Ionicons name="send" size={24} color="#8e8e93" />
             </TouchableOpacity>
           )}
         </View>
@@ -175,6 +181,14 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#f0f0f0',
+  },
+  defaultProfile: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
