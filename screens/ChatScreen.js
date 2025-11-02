@@ -10,7 +10,8 @@ export default function ChatScreen({ route, navigation }) {
   const flatListRef = useRef();
 
   useEffect(() => {
-    loadMessages();
+    const subscription = loadMessages();
+    return () => subscription.then(s => s.unsubscribe());
   }, []);
 
   const loadMessages = async () => {
@@ -26,8 +27,18 @@ export default function ChatScreen({ route, navigation }) {
       query.equalTo('chat', Parse.Object.createWithoutData('Chat', chatId));
       query.include('sender');
       query.ascending('createdAt');
+      
       const results = await query.find();
       setMessages(results);
+
+      const subscription = await query.subscribe();
+
+      subscription.on('create', (message) => {
+        setMessages(prevMessages => [...prevMessages, message]);
+      });
+
+      return subscription;
+
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -65,7 +76,6 @@ export default function ChatScreen({ route, navigation }) {
       await chat.save();
 
       setNewMessage('');
-      loadMessages(); // Refresh messages after sending
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -99,7 +109,7 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
             )}
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>{otherUser ? otherUser.username : 'Chat'}</Text>
+            <Text style={styles.headerTitle}>{otherUser ? otherUser.name || otherUser.username : 'Chat'}</Text>
             <Text style={styles.lastSeen}>Last seen today 11:00 AM</Text>
           </View>
           <TouchableOpacity style={styles.callButton}>

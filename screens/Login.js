@@ -1,58 +1,132 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, FlatList, Modal } from 'react-native';
 import Parse from '../config/parse';
 
+const countries = [
+  { name: 'United States', dial_code: '+1', flag: '🇺🇸' },
+  { name: 'United Kingdom', dial_code: '+44', flag: '🇬🇧' },
+  { name: 'India', dial_code: '+91', flag: '🇮🇳' },
+  { name: 'Pakistan', dial_code: '+92', flag: '🇵🇰' },
+  { name: 'Australia', dial_code: '+61', flag: '🇦🇺' },
+  { name: 'Canada', dial_code: '+1', flag: '🇨🇦' },
+];
+
 export default function Login({ navigation }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLogin, setIsLogin] = useState(true);
+  const [country, setCountry] = useState(countries[0]);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  const handleAuth = async () => {
-    if (!username || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
+  const sendOtp = async () => {
+    if (!phoneNumber) {
+        Alert.alert('Error', 'Please enter a phone number');
+        return;
     }
+    const fullPhoneNumber = `${country.dial_code}${phoneNumber}`;
+    const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    console.log(`OTP for ${fullPhoneNumber}: ${generatedOtp}`);
+    Alert.alert('OTP Sent', `OTP for ${fullPhoneNumber}: ${generatedOtp}`);
+    setOtpSent(true);
+  };
 
-    try {
-      if (isLogin) {
-        await Parse.User.logIn(username, password);
-        navigation.replace('ChatList');
-      } else {
-        const user = new Parse.User();
-        user.set('username', username);
-        user.set('password', password);
-        await user.signUp();
-        navigation.replace('ChatList');
-      }
-    } catch (error) {
-      Alert.alert('Error', error.message);
+  const verifyOtp = async () => {
+    if (!otp) {
+        Alert.alert('Error', 'Please enter the OTP');
+        return;
+    }
+    if (otp.length === 4) {
+        try {
+            const username = `${country.dial_code}${phoneNumber}`;
+            const password = 'dummyPassword';
+            let isNewUser = false;
+            try {
+                await Parse.User.logIn(username, password);
+            } catch (error) {
+                if (error.code === 101) { 
+                    const user = new Parse.User();
+                    user.set('username', username);
+                    user.set('password', password);
+                    user.set('phone', `${country.dial_code}${phoneNumber}`);
+                    await user.signUp();
+                    isNewUser = true;
+                } else {
+                    throw error;
+                }
+            }
+            if (isNewUser) {
+                navigation.replace('EnterName');
+            } else {
+                navigation.replace('ChatList');
+            }
+        } catch (error) {
+            Alert.alert('Error', error.message);
+        }
+    } else {
+        Alert.alert('Error', 'Invalid OTP');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{isLogin ? 'Login' : 'Sign Up'}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        value={username}
-        onChangeText={setUsername}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <TouchableOpacity style={styles.button} onPress={handleAuth}>
-        <Text style={styles.buttonText}>{isLogin ? 'Login' : 'Sign Up'}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
-        <Text style={styles.switchText}>
-          {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
-        </Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>Enter Your Phone Number</Text>
+      {!otpSent ? (
+          <>
+            <View style={styles.phoneInputContainer}>
+                <TouchableOpacity style={styles.countryButton} onPress={() => setDropdownVisible(true)}>
+                    <Text style={styles.flag}>{country.flag}</Text>
+                    <Text>{country.dial_code}</Text>
+                </TouchableOpacity>
+                <TextInput
+                    style={styles.phoneInput}
+                    placeholder="Phone Number"
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    keyboardType="phone-pad"
+                />
+            </View>
+            <Modal
+                transparent={true}
+                visible={dropdownVisible}
+                onRequestClose={() => setDropdownVisible(false)}
+            >
+                <TouchableOpacity style={styles.modalOverlay} onPress={() => setDropdownVisible(false)}>
+                    <View style={styles.dropdown}>
+                        <FlatList
+                            data={countries}
+                            keyExtractor={(item) => item.name}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity style={styles.countryItem} onPress={() => {
+                                    setCountry(item);
+                                    setDropdownVisible(false);
+                                }}>
+                                    <Text style={styles.flag}>{item.flag}</Text>
+                                    <Text style={styles.countryName}>{item.name}</Text>
+                                    <Text style={styles.dialCode}>{item.dial_code}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+            <TouchableOpacity style={styles.button} onPress={sendOtp}>
+                <Text style={styles.buttonText}>Verify</Text>
+            </TouchableOpacity>
+          </>
+      ) : (
+        <>
+            <TextInput
+                style={styles.input}
+                placeholder="Enter OTP"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+            />
+            <TouchableOpacity style={styles.button} onPress={verifyOtp}>
+                <Text style={styles.buttonText}>Verify</Text>
+            </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
@@ -78,6 +152,62 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#fff',
   },
+  phoneInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 15,
+  },
+  countryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#ddd',
+      padding: 15,
+      borderRadius: 8,
+      backgroundColor: '#fff',
+      marginRight: 10,
+  },
+  flag: {
+      fontSize: 20,
+      marginRight: 5,
+  },
+  phoneInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 15,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  modalOverlay: {
+      flex: 1,
+  },
+  dropdown: {
+      position: 'absolute',
+      top: 250, 
+      left: 20,
+      right: 20,
+      borderWidth: 1,
+      borderColor: '#ddd',
+      borderRadius: 8,
+      backgroundColor: '#fff',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  countryName: {
+    fontSize: 16,
+    flex: 1,
+  },
+  dialCode: {
+    fontSize: 16,
+    color: '#888',
+  },
   button: {
     backgroundColor: '#007AFF',
     padding: 15,
@@ -89,9 +219,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  switchText: {
-    textAlign: 'center',
-    color: '#007AFF',
   },
 });

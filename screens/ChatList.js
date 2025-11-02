@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Image, Animated, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Image, Animated, Modal, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Parse from '../config/parse';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -35,32 +35,29 @@ const dummySettings = [
     title: 'Invite a Friend',
     icon: 'person-add-outline',
   },
+  {
+    id: '7',
+    title: 'Logout',
+    icon: 'log-out-outline',
+  },
 ];
 
 export default function ChatList({ navigation }) {
   const [activeTab, setActiveTab] = useState('Chats');
   const [chats, setChats] = useState([]);
+  const [calls, setCalls] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredChats, setFilteredChats] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
+
   const swipeableRefs = useRef([]);
 
   useEffect(() => {
-    loadChats();
-  }, []);
-
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredChats(chats);
-    } else {
-      const filtered = chats.filter(chat =>
-        chat.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (chat.get('lastMessage') && chat.get('lastMessage').get('text').toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-      setFilteredChats(filtered);
-    }
-  }, [chats, searchQuery]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadChats();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadChats = async () => {
     try {
@@ -73,43 +70,14 @@ export default function ChatList({ navigation }) {
       const Chat = Parse.Object.extend('Chat');
       const query = new Parse.Query(Chat);
       query.equalTo('participants', currentUser);
-      query.include('participants');
+      query.include('participants.profilePic');
       query.include('lastMessage');
       query.descending('updatedAt');
       const results = await query.find();
       setChats(results);
+      setCalls(results); // Using same data for calls for now
     } catch (error) {
       console.error('Error loading chats:', error);
-    }
-  };
-
-  const createChat = async () => {
-    try {
-      const currentUser = Parse.User.current();
-      if (!currentUser) {
-        console.error('No current user');
-        return;
-      }
-
-      // For demonstration, let's create a chat with a dummy user
-      const User = Parse.Object.extend('_User');
-      const query = new Parse.Query(User);
-      query.notEqualTo("objectId", currentUser.id);
-      const dummyUser = await query.first();
-
-      if(!dummyUser) {
-          console.error("No other users to create a chat with.");
-          return;
-      }
-
-      const Chat = Parse.Object.extend('Chat');
-      const chat = new Chat();
-      chat.set('participants', [currentUser, dummyUser]);
-      await chat.save();
-      loadChats(); // Refresh chat list
-      navigation.navigate('ChatScreen', { chatId: chat.id, otherUser: { username: dummyUser.get('username'), profilePicUrl: dummyUser.get('profilePic')?.url() } });
-    } catch (error) {
-      console.error('Error creating chat:', error);
     }
   };
 
@@ -131,6 +99,19 @@ export default function ChatList({ navigation }) {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      const currentUser = Parse.User.current();
+      if (currentUser) {
+        await Parse.User.logOut();
+      }
+      navigation.replace('Login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      navigation.replace('Login');
+    }
+  };
+
   const renderRightActions = (progress, dragX, chat, index) => {
     return (
       <TouchableOpacity style={styles.deleteButton} onPress={() => {
@@ -148,8 +129,9 @@ export default function ChatList({ navigation }) {
     const participants = item.get('participants');
     const otherUser = participants.find(p => p.id !== currentUser.id);
 
-    const chatTitle = otherUser ? otherUser.get('username') : `Chat ${item.id.slice(-6)}`;
-    const profileImageUrl = otherUser && otherUser.get('profilePic') ? otherUser.get('profilePic').url() : null;
+    const chatTitle = otherUser ? otherUser.get('name') || otherUser.get('username') : `Chat ${item.id.slice(-6)}`;
+    const profileImage = otherUser.get('profilePic');
+    const profileImageUrl = profileImage ? profileImage.url() : null;
 
     return (
       <Swipeable 
@@ -161,7 +143,7 @@ export default function ChatList({ navigation }) {
           style={styles.chatItem}
           onPress={() => navigation.navigate('ChatScreen', { 
             chatId: item.id, 
-            otherUser: otherUser ? { username: otherUser.get('username'), profilePicUrl: profileImageUrl } : null 
+            otherUser: otherUser ? { name: otherUser.get('name'), username: otherUser.get('username'), profilePicUrl: profileImageUrl } : null 
           })}
         >
           {profileImageUrl ? (
@@ -187,8 +169,9 @@ export default function ChatList({ navigation }) {
     const participants = item.get('participants');
     const otherUser = participants.find(p => p.id !== currentUser.id);
 
-    const chatTitle = otherUser ? otherUser.get('username') : `Chat ${item.id.slice(-6)}`;
-    const profileImageUrl = otherUser && otherUser.get('profilePic') ? otherUser.get('profilePic').url() : null;
+    const chatTitle = otherUser ? otherUser.get('name') || otherUser.get('username') : `Chat ${item.id.slice(-6)}`;
+    const profileImage = otherUser.get('profilePic');
+    const profileImageUrl = profileImage ? profileImage.url() : null;
 
     // Dummy call data
     const callTypes = ['incoming', 'outgoing'];
@@ -221,7 +204,7 @@ export default function ChatList({ navigation }) {
                 </TouchableOpacity>
                 <TouchableOpacity style={{marginLeft: 20}} onPress={() => navigation.navigate('ChatScreen', { 
                     chatId: item.id, 
-                    otherUser: otherUser ? { username: otherUser.get('username'), profilePicUrl: profileImageUrl } : null 
+                    otherUser: otherUser ? { name: otherUser.get('name'), username: otherUser.get('username'), profilePicUrl: profileImageUrl } : null 
                 })}>
                     <Ionicons name="chatbubbles-outline" size={24} color="#8e8e93" />
                 </TouchableOpacity>
@@ -231,52 +214,77 @@ export default function ChatList({ navigation }) {
   }
 
   const renderSetting = ({ item }) => (
-    <TouchableOpacity style={styles.settingItem}>
-        <Ionicons name={item.icon} size={24} color="#007AFF" style={styles.settingIcon} />
-        <Text style={styles.settingTitle}>{item.title}</Text>
+    <TouchableOpacity style={styles.settingItem} onPress={item.title === 'Logout' ? handleLogout : () => {}}>
+        <Ionicons name={item.icon} size={24} color={item.title === 'Logout' ? 'red' : '#007AFF'} style={styles.settingIcon} />
+        <Text style={[styles.settingTitle, item.title === 'Logout' && styles.logoutText]}>{item.title}</Text>
     </TouchableOpacity>
   );
 
   const renderContent = () => {
-      switch(activeTab) {
-          case 'Chats':
-              return (
-                <FlatList
-                    data={filteredChats}
-                    renderItem={renderChat}
-                    keyExtractor={(item) => item.id}
-                    ItemSeparatorComponent={() => <View style={styles.separator} />}
-                    style={styles.list}
-                    ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>No chats found</Text>
-                    </View>
-                    }
-                />
-              );
-            case 'Calls':
-                return (
-                    <FlatList
-                        data={chats}
-                        renderItem={renderCall}
-                        keyExtractor={(item) => item.id}
-                        ItemSeparatorComponent={() => <View style={styles.separator} />}
-                    />
-                );
-            case 'Settings':
-                return (
-                    <FlatList
-                        data={dummySettings}
-                        renderItem={renderSetting}
-                        keyExtractor={(item) => item.id}
-                        ItemSeparatorComponent={() => <View style={styles.separator} />}
-                    />
-                );
+    let data;
+    let render;
+    let emptyText;
+
+    switch(activeTab) {
+        case 'Chats':
+            data = chats;
+            render = renderChat;
+            emptyText = "No chats found";
+            break;
+        case 'Calls':
+            data = calls;
+            render = renderCall;
+            emptyText = "No calls found";
+            break;
+        case 'Settings':
+            data = dummySettings;
+            render = renderSetting;
+            emptyText = "No settings found";
+            break;
+        default:
+            data = [];
+            render = () => null;
+            emptyText = "";
+    }
+
+    const lowercasedQuery = searchQuery.toLowerCase();
+    const filteredData = data.filter(item => {
+      if (!searchQuery.trim()) {
+          return true;
       }
+      if (activeTab === 'Settings') {
+          return item.title.toLowerCase().includes(lowercasedQuery);
+      }
+      if (item.get) {
+          const participants = item.get('participants');
+          if (!participants) return false;
+          const otherUser = participants.find(p => p.id !== Parse.User.current().id);
+          if (otherUser) {
+              const name = (otherUser.get('name') || otherUser.get('username')).toLowerCase();
+              return name.includes(lowercasedQuery);
+          }
+      }
+      return false;
+    });
+
+    return (
+      <FlatList
+          data={filteredData}
+          renderItem={render}
+          keyExtractor={(item) => item.id}
+          ItemSeparatorComponent={() => activeTab !== 'Settings' ? <View style={styles.separator} /> : null}
+          style={styles.list}
+          ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>{emptyText}</Text>
+              </View>
+          }
+      />
+    );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Modal
         animationType="slide"
         transparent={true}
@@ -309,6 +317,9 @@ export default function ChatList({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{activeTab}</Text>
+        {activeTab === 'Chats' && <TouchableOpacity style={styles.newChatButton} onPress={() => navigation.navigate('NewChat')}>
+            <Ionicons name="create-outline" size={24} color="#007AFF" />
+        </TouchableOpacity>}
       </View>
 
       {/* Search Bar */}
@@ -319,9 +330,6 @@ export default function ChatList({ navigation }) {
                 value={searchQuery}
                 onChangeText={setSearchQuery}
             />
-            {activeTab === 'Chats' && <TouchableOpacity style={styles.newChatButton} onPress={createChat}>
-            <Ionicons name="create" size={24} color="#8e8e93" />
-            </TouchableOpacity>}
         </View>
 
       {/* Content */}
@@ -348,7 +356,7 @@ export default function ChatList({ navigation }) {
           </View>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -358,6 +366,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: 50,
     paddingBottom: 10,
     paddingHorizontal: 20,
@@ -387,7 +398,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     backgroundColor: '#f8f8f8',
     fontSize: 16,
-    marginRight: 10,
   },
   newChatButton: {
     padding: 8,
@@ -399,7 +409,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    paddingVertical: 5,
+    paddingVertical: 15,
     paddingHorizontal: 15,
   },
   profileImage: {
@@ -432,12 +442,12 @@ const styles = StyleSheet.create({
   callItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5,
+    backgroundColor: '#fff',
+    paddingVertical: 15,
     paddingHorizontal: 15,
   },
   callInfo: {
     flex: 1,
-    marginLeft: 15,
   },
   callName: {
     fontSize: 16,
@@ -469,6 +479,9 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
   },
+  logoutText: {
+      color: 'red',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -487,6 +500,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 25,
     paddingHorizontal: 20,
+    marginBottom: 10,
   },
   navButton: {
     flex: 1,
