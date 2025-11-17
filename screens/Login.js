@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, FlatList, Modal } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Parse from '../config/parse';
+import { saveSession } from '../utils/session';
 
 const countries = [
   { name: 'United States', dial_code: '+1', flag: '🇺🇸' },
@@ -41,14 +43,23 @@ export default function Login({ navigation }) {
             const password = 'dummyPassword';
             let isNewUser = false;
             try {
-                await Parse.User.logIn(username, password);
+                const loggedInUser = await Parse.User.logIn(username, password);
+                await saveSession({ username, password });
+                const isRegisteredUser = loggedInUser.get('isRegistered');
+                if (isRegisteredUser) {
+                    navigation.replace('ChatList');
+                } else {
+                    navigation.replace('EnterName');
+                }
             } catch (error) {
                 if (error.code === 101) { 
                     const user = new Parse.User();
                     user.set('username', username);
                     user.set('password', password);
                     user.set('phone', `${country.dial_code}${phoneNumber}`);
+                    user.set('isRegistered', false);
                     await user.signUp();
+                    await saveSession({ username, password });
                     isNewUser = true;
                 } else {
                     throw error;
@@ -56,8 +67,6 @@ export default function Login({ navigation }) {
             }
             if (isNewUser) {
                 navigation.replace('EnterName');
-            } else {
-                navigation.replace('ChatList');
             }
         } catch (error) {
             Alert.alert('Error', error.message);
@@ -68,14 +77,21 @@ export default function Login({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Enter Your Phone Number</Text>
+    <LinearGradient
+      colors={['#0f2027', '#203a43', '#2c5364']}
+      style={styles.background}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <View style={styles.overlay}>
+    <View style={styles.card}>
+      <Text style={styles.title}>Verify Your Phone Number</Text>
       {!otpSent ? (
           <>
             <View style={styles.phoneInputContainer}>
                 <TouchableOpacity style={styles.countryButton} onPress={() => setDropdownVisible(true)}>
                     <Text style={styles.flag}>{country.flag}</Text>
-                    <Text>{country.dial_code}</Text>
+                    <Text style={styles.countryCodeText}>{country.dial_code}</Text>
                 </TouchableOpacity>
                 <TextInput
                     style={styles.phoneInput}
@@ -83,6 +99,7 @@ export default function Login({ navigation }) {
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
                     keyboardType="phone-pad"
+                    placeholderTextColor="rgba(255,255,255,0.7)"
                 />
             </View>
             <Modal
@@ -121,6 +138,7 @@ export default function Login({ navigation }) {
                 value={otp}
                 onChangeText={setOtp}
                 keyboardType="number-pad"
+                placeholderTextColor="rgba(255,255,255,0.7)"
             />
             <TouchableOpacity style={styles.button} onPress={verifyOtp}>
                 <Text style={styles.buttonText}>Verify</Text>
@@ -128,29 +146,41 @@ export default function Login({ navigation }) {
         </>
       )}
     </View>
+      </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  background: {
+    flex: 1,
+  },
+  overlay: {
     flex: 1,
     justifyContent: 'center',
     padding: 20,
-    backgroundColor: '#f5f5f5',
+  },
+  card: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 30,
+    color: '#fff',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'rgba(255,255,255,0.5)',
     padding: 15,
     marginBottom: 15,
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    color: '#fff',
   },
   phoneInputContainer: {
       flexDirection: 'row',
@@ -161,23 +191,28 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#ddd',
+      borderColor: 'rgba(255,255,255,0.5)',
       padding: 15,
       borderRadius: 8,
-      backgroundColor: '#fff',
+      backgroundColor: 'rgba(255,255,255,0.15)',
       marginRight: 10,
   },
   flag: {
       fontSize: 20,
       marginRight: 5,
   },
+  countryCodeText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
   phoneInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'rgba(255,255,255,0.5)',
     padding: 15,
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    color: '#fff',
   },
   modalOverlay: {
       flex: 1,

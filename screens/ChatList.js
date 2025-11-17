@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Image, Animated, Modal, SafeAreaView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Image, Animated, Modal, SafeAreaView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Parse from '../config/parse';
 import { Swipeable } from 'react-native-gesture-handler';
+import { tryRestoreUser, clearSession } from '../utils/session';
 
 const dummySettings = [
   {
@@ -52,6 +53,25 @@ export default function ChatList({ navigation }) {
 
   const swipeableRefs = useRef([]);
 
+  const handleInvalidSession = async (retryAction) => {
+    const restoredUser = await tryRestoreUser();
+    if (restoredUser && typeof retryAction === 'function') {
+      await retryAction();
+      return;
+    }
+    try {
+      await Parse.User.logOut();
+    } catch (logoutError) {
+      console.error('Error logging out after invalid session:', logoutError);
+    }
+    await clearSession();
+    Alert.alert('Session expired', 'Please log in again.');
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+  };
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadChats();
@@ -77,6 +97,10 @@ export default function ChatList({ navigation }) {
       setChats(results);
       setCalls(results); // Using same data for calls for now
     } catch (error) {
+      if (error.code === Parse.Error.INVALID_SESSION_TOKEN || error.code === 209) {
+        await handleInvalidSession(() => loadChats());
+        return;
+      }
       console.error('Error loading chats:', error);
     }
   };
@@ -95,9 +119,14 @@ export default function ChatList({ navigation }) {
       setModalVisible(false);
       loadChats(); // Refresh chat list
     } catch (error) {
+      if (error.code === Parse.Error.INVALID_SESSION_TOKEN || error.code === 209) {
+        await handleInvalidSession(() => deleteChat());
+        return;
+      }
       console.error('Error deleting chat:', error);
     }
   };
+
 
   const handleLogout = async () => {
     try {
@@ -105,6 +134,7 @@ export default function ChatList({ navigation }) {
       if (currentUser) {
         await Parse.User.logOut();
       }
+      await clearSession();
       navigation.replace('Login');
     } catch (error) {
       console.error('Error logging out:', error);

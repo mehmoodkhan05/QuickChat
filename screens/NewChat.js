@@ -14,6 +14,7 @@ export default function NewChat({ navigation }) {
         const currentUser = Parse.User.current();
         const userQuery = new Parse.Query(Parse.User);
         userQuery.notEqualTo('objectId', currentUser.id);
+        userQuery.equalTo('isRegistered', true);
         userQuery.include('profilePic');
         const results = await userQuery.find();
         setUsers(results);
