@@ -36,10 +36,21 @@ const dummySettings = [
 ];
 
 export default function SettingsScreen({ navigation }) {
+  const handleSettingPress = (item) => {
+    if (item.id === '1' && item.title === 'Account') {
+      navigation.navigate('ProfileScreen');
+    }
+  };
+
   const renderSetting = ({ item }) => (
-    <TouchableOpacity style={styles.settingItem}>
+    <TouchableOpacity 
+      style={styles.settingItem}
+      onPress={() => handleSettingPress(item)}
+      activeOpacity={0.7}
+    >
         <Ionicons name={item.icon} size={24} color="#007AFF" style={styles.settingIcon} />
         <Text style={styles.settingTitle}>{item.title}</Text>
+        <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.chevron} />
     </TouchableOpacity>
   );
 
@@ -80,6 +91,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 15,
+    backgroundColor: '#fff',
+  },
+  chevron: {
+    marginLeft: 'auto',
   },
   settingIcon: {
     marginRight: 15,

@@ -9,6 +9,7 @@ import ChatList from './screens/ChatList';
 import ChatScreen from './screens/ChatScreen';
 import NewChat from './screens/NewChat';
 import EnterName from './screens/EnterName';
+import ProfileScreen from './screens/ProfileScreen';
 import { tryRestoreUser } from './utils/session';
 
 const Stack = createStackNavigator();
@@ -57,6 +58,7 @@ export default function App() {
         <Stack.Screen name="ChatScreen" component={ChatScreen} options={{ headerShown: false }} />
         <Stack.Screen name="NewChat" component={NewChat} options={{ headerShown: false }} />
         <Stack.Screen name="EnterName" component={EnterName} options={{ headerShown: false }} />
+        <Stack.Screen name="ProfileScreen" component={ProfileScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

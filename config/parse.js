@@ -15,8 +15,11 @@ if (typeof global.crypto === 'undefined') {
   };
 }
 
-// Polyfill localStorage for Parse SDK
-if (typeof global.localStorage === 'undefined') {
+// Polyfill localStorage for Parse SDK (only for non-web platforms)
+// Check if we're on web by checking if window.localStorage exists
+const isWeb = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
+if (!isWeb && typeof global.localStorage === 'undefined') {
   global.localStorage = {
     getItem: async (key) => {
       try {
@@ -43,7 +46,10 @@ if (typeof global.localStorage === 'undefined') {
   };
 }
 
-Parse.setAsyncStorage(AsyncStorage);
+// Only set AsyncStorage for non-web platforms (web uses localStorage directly)
+if (!isWeb) {
+  Parse.setAsyncStorage(AsyncStorage);
+}
 Parse.initialize('bt8q6tlNoDTwlWDsoM3A6QbW9iKDKrs9YJXbgOcZ', 'U5WachqE4CNKUut0GbwQwd8RXsGVRr5UwqDpL97o');
 Parse.serverURL = 'https://parseapi.back4app.com';
 

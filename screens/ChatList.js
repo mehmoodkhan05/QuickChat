@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Image, Animated, Modal, SafeAreaView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Parse from '../config/parse';
@@ -62,7 +63,7 @@ export default function ChatList({ navigation }) {
     try {
       await Parse.User.logOut();
     } catch (logoutError) {
-      console.error('Error logging out after invalid session:', logoutError);
+      // Error logging out after invalid session
     }
     await clearSession();
     Alert.alert('Session expired', 'Please log in again.');
@@ -72,36 +73,48 @@ export default function ChatList({ navigation }) {
     });
   };
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
+  // Load chats when screen comes into focus (including initial mount)
+  useFocusEffect(
+    React.useCallback(() => {
       loadChats();
-    });
-    return unsubscribe;
-  }, [navigation]);
+    }, [])
+  );
 
   const loadChats = async () => {
     try {
       const currentUser = Parse.User.current();
       if (!currentUser) {
-        console.error('No current user');
         return;
       }
 
       const Chat = Parse.Object.extend('Chat');
       const query = new Parse.Query(Chat);
+      // Only get chats where current user is a participant
       query.equalTo('participants', currentUser);
+      query.include('participants');
       query.include('participants.profilePic');
       query.include('lastMessage');
       query.descending('updatedAt');
+      
       const results = await query.find();
-      setChats(results);
-      setCalls(results); // Using same data for calls for now
+      
+      // Double-check: filter to ensure only chats with current user are included
+      const validChats = results.filter(chat => {
+        const participants = chat.get('participants');
+        if (!participants || !Array.isArray(participants)) return false;
+        return participants.some(p => p.id === currentUser.id);
+      });
+      
+      setChats(validChats);
+      setCalls(validChats); // Using same data for calls for now
     } catch (error) {
       if (error.code === Parse.Error.INVALID_SESSION_TOKEN || error.code === 209) {
         await handleInvalidSession(() => loadChats());
         return;
       }
-      console.error('Error loading chats:', error);
+      // On error, set empty array to ensure no invalid chats are shown
+      setChats([]);
+      setCalls([]);
     }
   };
 
@@ -123,7 +136,7 @@ export default function ChatList({ navigation }) {
         await handleInvalidSession(() => deleteChat());
         return;
       }
-      console.error('Error deleting chat:', error);
+      Alert.alert('Error', 'Could not delete chat.');
     }
   };
 
@@ -137,7 +150,6 @@ export default function ChatList({ navigation }) {
       await clearSession();
       navigation.replace('Login');
     } catch (error) {
-      console.error('Error logging out:', error);
       navigation.replace('Login');
     }
   };
@@ -243,12 +255,22 @@ export default function ChatList({ navigation }) {
     );
   }
 
-  const renderSetting = ({ item }) => (
-    <TouchableOpacity style={styles.settingItem} onPress={item.title === 'Logout' ? handleLogout : () => {}}>
-        <Ionicons name={item.icon} size={24} color={item.title === 'Logout' ? 'red' : '#007AFF'} style={styles.settingIcon} />
-        <Text style={[styles.settingTitle, item.title === 'Logout' && styles.logoutText]}>{item.title}</Text>
-    </TouchableOpacity>
-  );
+  const renderSetting = ({ item }) => {
+    const handlePress = () => {
+      if (item.title === 'Logout') {
+        handleLogout();
+      } else if (item.title === 'Account') {
+        navigation.navigate('ProfileScreen');
+      }
+    };
+
+    return (
+      <TouchableOpacity style={styles.settingItem} onPress={handlePress}>
+          <Ionicons name={item.icon} size={24} color={item.title === 'Logout' ? 'red' : '#007AFF'} style={styles.settingIcon} />
+          <Text style={[styles.settingTitle, item.title === 'Logout' && styles.logoutText]}>{item.title}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderContent = () => {
     let data;
@@ -530,7 +552,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 25,
     paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 30,
   },
   navButton: {
     flex: 1,

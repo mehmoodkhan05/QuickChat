@@ -4,7 +4,7 @@ import Parse from '../config/parse';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export default function EnterName({ navigation }) {
   const [name, setName] = useState('');
@@ -31,7 +31,6 @@ export default function EnterName({ navigation }) {
         setProfilePic(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Image picker error:', error);
       Alert.alert('Error', 'Could not open your photo library.');
     }
   };
@@ -69,11 +68,17 @@ export default function EnterName({ navigation }) {
               await file.save();
               currentUser.set('profilePic', file);
             } catch (fileError) {
-              console.error('Profile image upload error:', fileError);
               Alert.alert('Image upload failed', 'We could not upload your image. You can continue without a photo.');
             }
         }
         currentUser.set('isRegistered', true);
+        
+        // Set ACL to allow authenticated users to read this user
+        const acl = new Parse.ACL();
+        acl.setPublicReadAccess(true); // Allow authenticated users to read
+        acl.setWriteAccess(currentUser, true); // Only owner can write
+        currentUser.setACL(acl);
+        
         await currentUser.save();
         navigation.replace('ChatList');
       } else {
